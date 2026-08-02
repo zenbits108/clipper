@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+output/*/
+!output/.gitkeep
+tests/fixtures/*
+!tests/fixtures/.gitkeep
+*.egg-info/
+.pytest_cache/
+.claude/settings.local.json

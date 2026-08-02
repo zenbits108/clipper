@@ -1,0 +1,52 @@
+# Template channel profile. Copy this file to config/channels/<your-channel>.yaml
+# and edit every field — nothing channel-specific belongs in code.
+
+name: example_channel
+
+selection:
+  # Full instructions for the LLM on what makes a good clip for this channel.
+  # Be specific: audience, subject matter, what a "hit" looks like, what to
+  # avoid. This is the main lever for tuning selection quality.
+  prompt: |
+    You select short-form clip candidates from a long-form podcast/interview
+    transcript for a channel about [TOPIC]. The audience wants punchy,
+    self-contained moments: a strong opinion, a surprising fact, a story with
+    a clear payoff, or actionable advice. Avoid clips that require context
+    from earlier in the episode to make sense. Prefer moments with a clear
+    verbal hook in the first 1-2 seconds.
+
+  # Short tone descriptor injected into the prompt alongside the instructions above.
+  tone: "conversational, opinionated, a little irreverent"
+
+  clip_length:
+    min_seconds: 20
+    max_seconds: 90
+
+  # Cap on how many candidates the LLM should return per run.
+  max_candidates: 8
+
+  # Which provider to call: "ollama" (local, fast, free) or "openrouter"
+  # (hosted, higher quality). Connection details live in config/settings.yaml.
+  provider: ollama
+
+  # Optional: overrides the provider's default_model from settings.yaml.
+  # Leave unset to use that default.
+  model: null
+
+# Caption styling used by captions.py (phase 4). Colors are ASS/SSA
+# &HAABBGGRR hex format.
+caption:
+  font: "Anton"
+  font_size: 96
+  primary_color: "&H00FFFFFF"   # white
+  highlight_color: "&H0000D7FF" # amber, word-highlight color
+  position: bottom_safe         # keep captions out of the bottom ~25% safe zone
+
+# Face-tracked crop vs fixed center crop vs blurred pillarbox, used by
+# reframe.py (phase 3).
+reframe:
+  mode: face-track
+
+hashtags:
+  - "#shorts"
+  - "#podcastclips"

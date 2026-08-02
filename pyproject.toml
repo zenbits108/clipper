@@ -1,0 +1,25 @@
+[project]
+name = "clipper"
+version = "0.1.0"
+description = "Long-form video -> 9:16 Shorts pipeline"
+requires-python = ">=3.11"
+dependencies = [
+    "faster-whisper>=1.0.0",
+    "mediapipe>=0.10.14",
+    "PyYAML>=6.0",
+    "requests>=2.31",
+]
+
+[project.scripts]
+clipper = "clipper.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["clipper*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

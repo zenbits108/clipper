@@ -1,0 +1,20 @@
+# Global, non-channel-specific settings. Channel profiles (config/channels/*.yaml)
+# pick a provider by name; connection details for that provider live here so
+# no provider is ever hardcoded in code.
+
+llm:
+  ollama:
+    base_url: "http://localhost:11434"
+    default_model: "llama3.1:8b"
+  openrouter:
+    base_url: "https://openrouter.ai/api/v1"
+    api_key_env: "OPENROUTER_API_KEY"
+    default_model: "anthropic/claude-3.5-sonnet"
+
+paths:
+  output_dir: "output"
+
+transcribe:
+  model_size: "large-v3"
+  device: "auto"
+  compute_type: "auto"
