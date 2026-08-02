@@ -31,9 +31,13 @@ Rules:
 - Return at most {max_candidates} candidates.
 - Each clip must work as a self-contained moment: a hook, a payoff, no
   dangling references to unseen context.
+- "hook" is on-screen text, not a transcript quote: rewrite the speaker's
+  point as a tight, grammatical line — cut filler words, false starts, and
+  run-ons. Aim for under 12 words. It should read like a caption someone
+  wrote on purpose, not a stretch of raw speech.
 
 Respond with ONLY a JSON array (no prose, no markdown fences). Each element:
-{{"start": <seconds, float>, "end": <seconds, float>, "hook": "<on-screen hook line>", "title": "<short YouTube Shorts title>", "score": <0-10 float>, "reason": "<one sentence on why this works>"}}
+{{"start": <seconds, float>, "end": <seconds, float>, "hook": "<tight, cleaned-up on-screen hook line, NOT a verbatim transcript quote>", "title": "<short YouTube Shorts title>", "score": <0-10 float>, "reason": "<one sentence on why this works>"}}
 
 Transcript:
 {transcript_block}
