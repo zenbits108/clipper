@@ -2,10 +2,11 @@
 
     clipper select video.mp4 --channel <name>   # phase 1
     clipper cut video.mp4                        # phase 2
+    clipper reframe video.mp4 --channel <name>   # phase 3
 
 `cut` is the approval gate: it reads the candidates `select` already wrote,
 shows them again, and only renders the ids the user accepts (or --all /
---clips to skip the prompt). Later phases add reframe/captions/package.
+--clips to skip the prompt). Later phases add captions/package.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from pathlib import Path
 from clipper.config import ConfigError, load_channel, load_settings
 from clipper.cut import CutError, cut_clip
 from clipper.llm import ProviderError
+from clipper.reframe import ReframeError, reframe_clip
 from clipper.select import SelectError, select_clips
 from clipper.transcribe import TranscribeError, transcribe_video, video_id_for
 
@@ -129,6 +131,57 @@ def _cmd_cut(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_reframe(args: argparse.Namespace) -> int:
+    video_path = Path(args.video)
+    try:
+        settings = load_settings()
+        channel = load_channel(args.channel)
+    except ConfigError as exc:
+        print(f"Config error: {exc}", file=sys.stderr)
+        return 1
+
+    video_dir = settings.output_dir / video_id_for(video_path)
+    clip_dirs = sorted(
+        d for d in video_dir.glob("clip-*") if d.is_dir() and (d / "cut.mp4").exists()
+    )
+    if not clip_dirs:
+        print(
+            f"No cut clips found under {video_dir}. Run `clipper cut` first.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if args.clips:
+        wanted = {c.strip() for c in args.clips.split(",") if c.strip()}
+        unknown = wanted - {d.name for d in clip_dirs}
+        if unknown:
+            print(f"Unknown clip id(s): {', '.join(sorted(unknown))}", file=sys.stderr)
+            return 1
+        clip_dirs = [d for d in clip_dirs if d.name in wanted]
+
+    failures = []
+    processed = 0
+    for clip_dir in clip_dirs:
+        if (clip_dir / "reframed.mp4").exists() and not args.force:
+            print(f"[{clip_dir.name}] already reframed, skipping (use --force to redo)")
+            continue
+        try:
+            meta = reframe_clip(clip_dir / "cut.mp4", clip_dir, channel)
+        except ReframeError as exc:
+            print(f"[{clip_dir.name}] FAILED: {exc}", file=sys.stderr)
+            failures.append(clip_dir.name)
+            continue
+        rate = f"{meta['detection_rate']:.0%}" if meta["detection_rate"] is not None else "n/a"
+        print(f"[{clip_dir.name}] mode={meta['mode_used']} detection={rate} -> {meta['output_path']}")
+        processed += 1
+
+    if failures:
+        print(f"\n{len(failures)} clip(s) failed: {', '.join(failures)}", file=sys.stderr)
+        return 1
+    print(f"\n{processed} clip(s) reframed.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="clipper")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -159,6 +212,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated candidate ids to render without prompting, e.g. clip-01,clip-03",
     )
     cut_parser.set_defaults(func=_cmd_cut)
+
+    reframe_parser = subparsers.add_parser(
+        "reframe", help="Crop cut clips to 9:16 (face-tracked or config-selected fallback)"
+    )
+    reframe_parser.add_argument("video", help="Path to the source video file")
+    reframe_parser.add_argument(
+        "--channel", required=True, help="Channel config name (config/channels/<name>.yaml)"
+    )
+    reframe_parser.add_argument(
+        "--clips", help="Comma-separated clip ids to reframe, e.g. clip-01,clip-03"
+    )
+    reframe_parser.add_argument(
+        "--force", action="store_true", help="Re-reframe clips that already have reframed.mp4"
+    )
+    reframe_parser.set_defaults(func=_cmd_reframe)
 
     return parser
 
