@@ -15,6 +15,19 @@ class StubProvider:
         return self.response_text
 
 
+class SequenceProvider:
+    """Returns each response in `responses` in order, one per call."""
+
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.calls = 0
+
+    def complete(self, prompt):
+        response = self.responses[self.calls]
+        self.calls += 1
+        return response
+
+
 FAKE_TRANSCRIPT = {
     "video_path": "/fake/video.mp4",
     "video_id": "video",
@@ -79,3 +92,27 @@ def test_select_clips_raises_on_non_json_response(monkeypatch, settings, channel
     monkeypatch.setattr(select, "get_provider", lambda *a, **k: StubProvider("not json at all"))
     with pytest.raises(select.SelectError):
         select.select_clips(Path("video.mp4"), FAKE_TRANSCRIPT, channel, settings)
+
+
+def test_select_clips_retries_once_after_a_prose_response(monkeypatch, settings, channel):
+    good_response = json.dumps(
+        [{"start": 5.0, "end": 40.0, "hook": "hook", "title": "title", "score": 8, "reason": "why"}]
+    )
+    provider = SequenceProvider(["Here are the top candidates:\n1. blah blah", good_response])
+    monkeypatch.setattr(select, "get_provider", lambda *a, **k: provider)
+
+    candidates = select.select_clips(Path("video.mp4"), FAKE_TRANSCRIPT, channel, settings)
+
+    assert provider.calls == 2
+    assert len(candidates) == 1
+    assert candidates[0]["title"] == "title"
+
+
+def test_select_clips_gives_up_after_max_attempts_of_bad_output(monkeypatch, settings, channel):
+    provider = SequenceProvider(["prose one", "prose two", "prose three"])
+    monkeypatch.setattr(select, "get_provider", lambda *a, **k: provider)
+
+    with pytest.raises(select.SelectError):
+        select.select_clips(Path("video.mp4"), FAKE_TRANSCRIPT, channel, settings)
+
+    assert provider.calls == select.MAX_FORMAT_ATTEMPTS

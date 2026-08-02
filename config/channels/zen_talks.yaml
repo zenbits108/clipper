@@ -26,7 +26,7 @@ selection:
   max_candidates: 6
 
   provider: ollama
-  model: llama3.1:8b
+  model: qwen3:14b
 
 caption:
   font: "Anton"

@@ -25,19 +25,32 @@ strongest standalone clip candidates for short-form vertical video (YouTube
 Shorts / TikTok / Reels).
 
 Rules:
-- Each clip must be between {min_s:.0f} and {max_s:.0f} seconds long.
+- The "hook" is one short line the speaker says. The clip's start/end are
+  NOT just that line's timestamps — they must span the full continuous
+  excerpt around it. Find the hook first, then expand outward (earlier for
+  setup, later for the payoff or follow-through) until the excerpt is a
+  complete, self-contained thought that reaches at least {min_s:.0f}
+  seconds, stopping at a natural sentence/thought boundary no later than
+  {max_s:.0f} seconds. If start/end tightly bound only the hook sentence
+  itself, the clip is wrong — it is almost always far too short. Every
+  clip must satisfy {min_s:.0f}-{max_s:.0f} seconds; this is a hard
+  requirement, not a suggestion.
 - start and end timestamps must fall within the transcript below — do not
   invent timestamps outside the video's duration.
 - Return at most {max_candidates} candidates.
-- Each clip must work as a self-contained moment: a hook, a payoff, no
-  dangling references to unseen context.
-- "hook" is on-screen text, not a transcript quote: rewrite the speaker's
-  point as a tight, grammatical line — cut filler words, false starts, and
-  run-ons. Aim for under 12 words. It should read like a caption someone
-  wrote on purpose, not a stretch of raw speech.
+- Each clip must work as a self-contained moment: real setup, the hook,
+  and a payoff or continuation, no dangling references to unseen context.
+- "hook" in the JSON output is on-screen text, not a transcript quote:
+  rewrite the speaker's point as a tight, grammatical line — cut filler
+  words, false starts, and run-ons. Aim for under 12 words. It should read
+  like a caption someone wrote on purpose, not a stretch of raw speech.
 
-Respond with ONLY a JSON array (no prose, no markdown fences). Each element:
-{{"start": <seconds, float>, "end": <seconds, float>, "hook": "<tight, cleaned-up on-screen hook line, NOT a verbatim transcript quote>", "title": "<short YouTube Shorts title>", "score": <0-10 float>, "reason": "<one sentence on why this works>"}}
+Output format is a hard requirement: respond with ONLY a JSON array. No
+prose before or after it, no headers, no bullet points, no bold text, no
+markdown fences, no explanation of what you're about to do. The very
+first character of your response must be [ and the very last must be ].
+Each element:
+{{"start": <seconds, float — start of the FULL excerpt, not the hook line>, "end": <seconds, float — end of the FULL excerpt; end minus start must be {min_s:.0f}-{max_s:.0f}>, "hook": "<tight, cleaned-up on-screen hook line, NOT a verbatim transcript quote>", "title": "<short YouTube Shorts title>", "score": <0-10 float>, "reason": "<one sentence on why this works>"}}
 
 Transcript:
 {transcript_block}
@@ -127,6 +140,9 @@ def _validate_candidates(raw: Any, transcript: dict, channel: ChannelConfig) -> 
     return candidates
 
 
+MAX_FORMAT_ATTEMPTS = 2  # some models intermittently ignore "JSON only" and answer in prose
+
+
 def select_clips(
     video_path: Path,
     transcript: dict,
@@ -139,8 +155,20 @@ def select_clips(
     video_path = Path(video_path)
     provider = get_provider(channel.selection.provider, settings, channel.selection.model)
     prompt = build_prompt(transcript, channel)
-    response = provider.complete(prompt)
-    raw = _extract_json_array(response)
+
+    raw = None
+    parse_error = None
+    for _ in range(MAX_FORMAT_ATTEMPTS):
+        response = provider.complete(prompt)
+        try:
+            raw = _extract_json_array(response)
+            parse_error = None
+            break
+        except SelectError as exc:
+            parse_error = exc
+    if parse_error is not None:
+        raise parse_error
+
     candidates = _validate_candidates(raw, transcript, channel)
 
     output = {

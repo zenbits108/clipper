@@ -29,7 +29,10 @@ class Provider(Protocol):
 class OllamaProvider:
     base_url: str
     model: str
-    timeout: float = 300.0
+    # Local inference time scales with model size and whatever else shares
+    # the GPU; a 7-8B model finishes in well under a minute, but a larger
+    # local model (or one competing for VRAM) can take several minutes.
+    timeout: float = 900.0
 
     def complete(self, prompt: str) -> str:
         url = f"{self.base_url.rstrip('/')}/api/generate"
