@@ -1,0 +1,45 @@
+# Real channel profile for the Zen/spirituality commentary talks
+# (e.g. "windows docs" / "Zen in the West" source material).
+
+name: zen_talks
+
+selection:
+  prompt: |
+    You select short-form clip candidates from a long-form talk about Zen,
+    spirituality, and modern spiritual culture. The speaker gives
+    unscripted, discursive commentary — often critical or contrarian takes
+    on how spiritual practice, teachers, or communities operate.
+
+    A good clip has a single sharp claim or reframe that lands on its own:
+    a pointed critique, a surprising distinction, a memorable one-liner, or
+    a short argument with a clear conclusion. The clip should not require
+    the viewer to have heard anything earlier in the talk. Avoid clips that
+    are mid-thought, trail off without a conclusion, or rely on a specific
+    named example the viewer won't recognize without setup.
+
+  tone: "direct, contrarian, dry wit, unhurried but pointed"
+
+  clip_length:
+    min_seconds: 20
+    max_seconds: 75
+
+  max_candidates: 6
+
+  provider: ollama
+  model: llama3.1:8b
+
+caption:
+  font: "Anton"
+  font_size: 96
+  primary_color: "&H00FFFFFF"
+  highlight_color: "&H0000D7FF"
+  position: bottom_safe
+
+reframe:
+  mode: center
+
+hashtags:
+  - "#shorts"
+  - "#zen"
+  - "#spirituality"
+  - "#mindfulness"
