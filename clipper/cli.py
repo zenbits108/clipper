@@ -5,10 +5,12 @@
     clipper reframe video.mp4 --channel <name>   # phase 3
     clipper caption video.mp4 --channel <name>   # phase 4
     clipper package video.mp4 --channel <name>   # phase 5
+    clipper upload video.mp4 --channel <name>    # phase 6
 
-`cut` is the approval gate: it reads the candidates `select` already wrote,
-shows them again, and only renders the ids the user accepts (or --all /
---clips to skip the prompt).
+`cut` and `upload` are both approval gates: they re-display candidates/clips
+and only act on the ids the user accepts (or --all / --clips to skip the
+prompt) -- `upload` additionally never re-uploads a clip that already has an
+upload.json unless --force, since re-uploading creates a brand new video.
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ from clipper.package import PackageError, package_clip
 from clipper.reframe import ReframeError, reframe_clip
 from clipper.select import SelectError, select_clips
 from clipper.transcribe import TranscribeError, transcribe_video, video_id_for
+from clipper.upload import UploadError, upload_clip
 
 
 def _cmd_select(args: argparse.Namespace) -> int:
@@ -325,6 +328,75 @@ def _cmd_package(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_upload(args: argparse.Namespace) -> int:
+    video_path = Path(args.video)
+    try:
+        settings = load_settings()
+        channel = load_channel(args.channel)
+    except ConfigError as exc:
+        print(f"Config error: {exc}", file=sys.stderr)
+        return 1
+
+    video_dir = settings.output_dir / video_id_for(video_path)
+    clip_dirs = sorted(
+        d for d in video_dir.glob("clip-*")
+        if d.is_dir() and (d / "clip.mp4").exists() and (d / "meta.json").exists()
+    )
+    if not clip_dirs:
+        print(
+            f"No packaged clips found under {video_dir}. Run `clipper package` first.",
+            file=sys.stderr,
+        )
+        return 1
+    by_id = {d.name: d for d in clip_dirs}
+
+    if args.all:
+        selected_ids = list(by_id)
+    elif args.clips:
+        selected_ids = [c.strip() for c in args.clips.split(",") if c.strip()]
+    else:
+        for clip_dir in clip_dirs:
+            meta = json.loads((clip_dir / "meta.json").read_text(encoding="utf-8"))
+            tag = " [already uploaded]" if (clip_dir / "upload.json").exists() else ""
+            print(f"[{clip_dir.name}] \"{meta['title']}\"{tag}")
+        privacy = args.privacy or channel.upload.privacy_status
+        raw = input(
+            f"\nUpload which clips to YouTube as '{privacy}'? "
+            "Comma-separated ids, 'all', or blank to cancel: "
+        ).strip()
+        if not raw:
+            print("Cancelled.")
+            return 0
+        selected_ids = list(by_id) if raw.lower() == "all" else [c.strip() for c in raw.split(",") if c.strip()]
+
+    unknown = [i for i in selected_ids if i not in by_id]
+    if unknown:
+        print(f"Unknown clip id(s): {', '.join(unknown)}", file=sys.stderr)
+        return 1
+
+    failures = []
+    processed = 0
+    for clip_id in selected_ids:
+        clip_dir = by_id[clip_id]
+        if (clip_dir / "upload.json").exists() and not args.force:
+            print(f"[{clip_id}] already uploaded, skipping (use --force to re-upload)")
+            continue
+        try:
+            meta = upload_clip(clip_dir, channel, settings, privacy_status=args.privacy)
+        except UploadError as exc:
+            print(f"[{clip_id}] FAILED: {exc}", file=sys.stderr)
+            failures.append(clip_id)
+            continue
+        print(f"[{clip_id}] uploaded ({meta['privacy_status']}) -> {meta['url']}")
+        processed += 1
+
+    if failures:
+        print(f"\n{len(failures)} clip(s) failed: {', '.join(failures)}", file=sys.stderr)
+        return 1
+    print(f"\n{processed} clip(s) uploaded.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="clipper")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -400,6 +472,29 @@ def build_parser() -> argparse.ArgumentParser:
         "--force", action="store_true", help="Re-package clips that already have meta.json/thumb.jpg"
     )
     package_parser.set_defaults(func=_cmd_package)
+
+    upload_parser = subparsers.add_parser(
+        "upload", help="Upload packaged clips to YouTube (defaults to private)"
+    )
+    upload_parser.add_argument("video", help="Path to the source video file")
+    upload_parser.add_argument(
+        "--channel", required=True, help="Channel config name (config/channels/<name>.yaml)"
+    )
+    upload_parser.add_argument(
+        "--all", action="store_true", help="Upload every eligible clip without prompting"
+    )
+    upload_parser.add_argument(
+        "--clips", help="Comma-separated clip ids to upload without prompting, e.g. clip-01,clip-03"
+    )
+    upload_parser.add_argument(
+        "--privacy",
+        choices=["private", "unlisted", "public"],
+        help="Override the channel's configured privacy_status for this run",
+    )
+    upload_parser.add_argument(
+        "--force", action="store_true", help="Re-upload clips that already have upload.json (creates a NEW video)"
+    )
+    upload_parser.set_defaults(func=_cmd_upload)
 
     return parser
 

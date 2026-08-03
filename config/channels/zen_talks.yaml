@@ -43,6 +43,10 @@ caption:
 reframe:
   mode: center
 
+upload:
+  privacy_status: private   # private | unlisted | public -- review in Studio before going public
+  category_id: "22"         # People & Blogs
+
 hashtags:
   - "#shorts"
   - "#zen"

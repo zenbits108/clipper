@@ -47,6 +47,12 @@ caption:
 reframe:
   mode: face-track
 
+# YouTube Data API upload settings, used by upload.py (phase 6). Requires a
+# one-time OAuth consent flow per channel -- see README.md.
+upload:
+  privacy_status: private   # private | unlisted | public -- start private, publish manually after review
+  category_id: "22"         # YouTube category id; 22 = People & Blogs
+
 hashtags:
   - "#shorts"
   - "#podcastclips"

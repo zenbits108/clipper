@@ -33,9 +33,16 @@ class OpenRouterSettings:
 
 
 @dataclasses.dataclass
+class YouTubeSettings:
+    client_secrets_path: Path
+    scopes: list
+
+
+@dataclasses.dataclass
 class Settings:
     ollama: OllamaSettings
     openrouter: OpenRouterSettings
+    youtube: YouTubeSettings
     output_dir: Path
     whisper_model_size: str
     whisper_device: str
@@ -73,17 +80,25 @@ class ReframeConfig:
 
 
 @dataclasses.dataclass
+class UploadConfig:
+    privacy_status: str
+    category_id: str
+
+
+@dataclasses.dataclass
 class ChannelConfig:
     name: str
     selection: SelectionConfig
     caption: CaptionConfig
     reframe: ReframeConfig
+    upload: UploadConfig
     hashtags: list
 
 
 VALID_REFRAME_MODES = {"face-track", "center", "blur-pillarbox"}
 VALID_PROVIDERS = {"ollama", "openrouter"}
 VALID_CAPTION_POSITIONS = {"bottom_safe", "middle", "top_safe"}
+VALID_PRIVACY_STATUSES = {"private", "unlisted", "public"}
 
 
 def _require(d: dict, key: str, ctx: str) -> Any:
@@ -101,6 +116,7 @@ def load_settings(path: Optional[Path] = None) -> Settings:
     llm_raw = _require(raw, "llm", str(path))
     ollama_raw = _require(llm_raw, "ollama", "llm.ollama")
     openrouter_raw = _require(llm_raw, "openrouter", "llm.openrouter")
+    youtube_raw = raw.get("youtube", {})
     paths_raw = raw.get("paths", {})
     transcribe_raw = raw.get("transcribe", {})
 
@@ -113,6 +129,14 @@ def load_settings(path: Optional[Path] = None) -> Settings:
             base_url=_require(openrouter_raw, "base_url", "llm.openrouter"),
             api_key_env=_require(openrouter_raw, "api_key_env", "llm.openrouter"),
             default_model=_require(openrouter_raw, "default_model", "llm.openrouter"),
+        ),
+        youtube=YouTubeSettings(
+            client_secrets_path=REPO_ROOT / youtube_raw.get(
+                "client_secrets_path", "config/youtube_client_secret.json"
+            ),
+            scopes=list(
+                youtube_raw.get("scopes", ["https://www.googleapis.com/auth/youtube"])
+            ),
         ),
         output_dir=REPO_ROOT / paths_raw.get("output_dir", "output"),
         whisper_model_size=transcribe_raw.get("model_size", "large-v3"),
@@ -176,10 +200,23 @@ def load_channel(name: str, config_dir: Optional[Path] = None) -> ChannelConfig:
     )
     reframe = ReframeConfig(mode=reframe_mode)
 
+    upload_raw = raw.get("upload", {})
+    privacy_status = upload_raw.get("privacy_status", "private")
+    if privacy_status not in VALID_PRIVACY_STATUSES:
+        raise ConfigError(
+            f"Invalid upload.privacy_status '{privacy_status}' in {path}; "
+            f"must be one of {sorted(VALID_PRIVACY_STATUSES)}"
+        )
+    upload = UploadConfig(
+        privacy_status=privacy_status,
+        category_id=str(upload_raw.get("category_id", "22")),  # 22 = People & Blogs
+    )
+
     return ChannelConfig(
         name=raw.get("name", name),
         selection=selection,
         caption=caption,
         reframe=reframe,
+        upload=upload,
         hashtags=list(raw.get("hashtags", [])),
     )

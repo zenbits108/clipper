@@ -11,6 +11,16 @@ llm:
     api_key_env: "OPENROUTER_API_KEY"
     default_model: "anthropic/claude-opus-5"
 
+# OAuth client for the YouTube Data API v3. client_secrets_path points at a
+# JSON file you download from Google Cloud Console (OAuth client ID, type
+# "Desktop app") -- it's gitignored, you must provide your own. One OAuth
+# app/client is shared across channels; each channel gets its own cached
+# token (from its own one-time consent flow) at .youtube_tokens/<channel>.json.
+youtube:
+  client_secrets_path: "config/youtube_client_secret.json"
+  scopes:
+    - "https://www.googleapis.com/auth/youtube"
+
 paths:
   output_dir: "output"
 

@@ -35,11 +35,13 @@ clipper cut "path/to/video.mp4"
 clipper reframe "path/to/video.mp4" --channel example_channel
 clipper caption "path/to/video.mp4" --channel example_channel
 clipper package "path/to/video.mp4" --channel example_channel
+clipper upload "path/to/video.mp4" --channel example_channel   # optional, see YouTube upload setup below
 ```
 
 Each finished clip lands in `output/<video-id>/<clip-NN>/` with `clip.mp4`,
-`meta.json`, and `thumb.jpg` — drag `clip.mp4` straight into YouTube Studio,
-`meta.json` has the title/description/hashtags to paste in alongside it.
+`meta.json`, and `thumb.jpg` — either drag `clip.mp4` straight into YouTube
+Studio yourself, or run `clipper upload` to push it there via the API
+(uploads land **private** by default; you still review and publish manually).
 
 ## Set up a channel first
 
@@ -69,9 +71,13 @@ Fields that matter most:
   too few sampled frames have a detectable face.
 - `caption.position` — `bottom_safe` (default, stays out of the bottom ~25%
   of the frame — the Shorts UI safe zone), `middle`, or `top_safe`.
+- `upload.privacy_status` — `private` (default), `unlisted`, or `public`.
+  Videos are never uploaded public by default — you publish manually after
+  reviewing in Studio. `upload.category_id` is a YouTube category id
+  (default `"22"`, People & Blogs).
 - `hashtags` — pool used in every clip's `meta.json` description.
 
-## The five stages
+## The six stages
 
 ### 1. `select` — transcribe + pick candidates
 
@@ -132,6 +138,23 @@ Processes every clip that has a `clip.mp4`. Writes `<clip-id>/meta.json`
 (grabbed at the moment the hook is actually spoken, found by matching the
 LLM's hook line against the clip's own transcript).
 
+### 6. `upload` — push to YouTube
+
+```bash
+clipper upload video.mp4 --channel my_channel                        # interactive
+clipper upload video.mp4 --channel my_channel --all                  # upload every eligible clip
+clipper upload video.mp4 --channel my_channel --clips clip-01,clip-03
+clipper upload video.mp4 --channel my_channel --privacy unlisted     # override for this run
+```
+
+Requires one-time setup — see **YouTube upload setup** below. Re-displays
+the packaged clips and only uploads the ids you accept, same as `cut`. A
+clip that already has an `upload.json` is skipped by default (re-uploading
+creates a **new**, separate YouTube video, not an update to the old one) —
+pass `--force` if that's genuinely what you want. Writes `<clip-id>/upload.json`
+with the resulting video id and URL. Sets the video's thumbnail from
+`thumb.jpg` after upload; a thumbnail failure doesn't fail the whole upload.
+
 ## Output layout
 
 ```
@@ -142,7 +165,8 @@ output/<video-id>/
     ├── cut.mp4  cut.json
     ├── reframed.mp4  reframe.json
     ├── clip.mp4  captions.ass  captions.json    # final video
-    └── meta.json  thumb.jpg                      # ready to upload
+    ├── meta.json  thumb.jpg                      # ready to upload
+    └── upload.json                                # after `clipper upload`
 ```
 
 Every stage reads/writes its own JSON artifact, so any stage can be re-run
@@ -152,10 +176,39 @@ re-run just `clipper caption --force` without re-cutting or re-reframing).
 ## Config files
 
 - `config/settings.yaml` — LLM provider connection details (Ollama base URL,
-  OpenRouter API key env var name, default models) and whisper defaults
-  (`large-v3`, device/compute type `auto`). Not channel-specific.
+  OpenRouter API key env var name, default models), whisper defaults
+  (`large-v3`, device/compute type `auto`), and the shared YouTube OAuth
+  client path/scopes. Not channel-specific.
 - `config/channels/*.yaml` — everything channel-specific: selection prompt,
-  clip length, caption style, reframe mode, hashtags.
+  clip length, caption style, reframe mode, upload privacy/category,
+  hashtags.
+
+## YouTube upload setup
+
+`clipper upload` needs an OAuth client registered in Google Cloud Console —
+this is a one-time, per-Google-account setup step you do yourself (it can't
+be automated, since it requires your own account and browser):
+
+1. Create a project in the [Google Cloud Console](https://console.cloud.google.com/).
+2. Enable the **YouTube Data API v3** for that project.
+3. Configure the OAuth consent screen (External is fine for personal use;
+   add your own Google account as a test user if the app stays in "Testing"
+   mode — no need to publish it).
+4. Create an **OAuth client ID** of type **Desktop app**.
+5. Download the client JSON and save it at the path in
+   `config/settings.yaml`'s `youtube.client_secrets_path` (default
+   `config/youtube_client_secret.json`) — this file is gitignored, never
+   commit it.
+
+The first `clipper upload` run for a given channel opens a browser for you
+to sign in and grant access; the resulting token is cached at
+`.youtube_tokens/<channel>.json` (also gitignored) so later runs don't
+prompt again, and refreshes automatically until it's revoked.
+
+**Quota**: the default YouTube Data API quota is 10,000 units/day, and a
+single video upload costs ~1,600 units — roughly 6 uploads/day per Google
+Cloud project on the default quota. Request a quota increase in the Cloud
+Console if you need more.
 
 ## Testing
 

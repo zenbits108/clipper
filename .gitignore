@@ -9,3 +9,8 @@ tests/fixtures/*
 *.egg-info/
 .pytest_cache/
 .claude/
+
+# YouTube OAuth: never commit credentials or per-channel tokens
+config/youtube_client_secret.json
+*client_secret*.json
+.youtube_tokens/
