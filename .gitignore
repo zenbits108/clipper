@@ -8,4 +8,4 @@ tests/fixtures/*
 !tests/fixtures/.gitkeep
 *.egg-info/
 .pytest_cache/
-.claude/settings.local.json
+.claude/

@@ -17,16 +17,21 @@ selection:
     are mid-thought, trail off without a conclusion, or rely on a specific
     named example the viewer won't recognize without setup.
 
+    Prefer clips in the 30-60 second range — that's the sweet spot for
+    watch-through on this format. Only go longer, up to the max, when the
+    argument genuinely needs the extra runway to land; don't pad a short
+    point out just to fill time.
+
   tone: "direct, contrarian, dry wit, unhurried but pointed"
 
   clip_length:
-    min_seconds: 20
-    max_seconds: 75
+    min_seconds: 25
+    max_seconds: 120
 
   max_candidates: 6
 
-  provider: ollama
-  model: qwen3:14b
+  provider: openrouter
+  model: anthropic/claude-opus-5
 
 caption:
   font: "Anton"

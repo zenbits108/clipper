@@ -9,7 +9,7 @@ llm:
   openrouter:
     base_url: "https://openrouter.ai/api/v1"
     api_key_env: "OPENROUTER_API_KEY"
-    default_model: "anthropic/claude-3.5-sonnet"
+    default_model: "anthropic/claude-opus-5"
 
 paths:
   output_dir: "output"
