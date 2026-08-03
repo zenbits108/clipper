@@ -29,6 +29,25 @@ pip install -e .
 
 ## Quick start
 
+The easiest way to run it — `run_clipper.sh` chains `select` through
+`package` for one video/channel into a single command:
+
+```bash
+./run_clipper.sh "path/to/video.mp4" example_channel
+```
+
+`cut`'s approval prompt still runs interactively in the middle of it — this
+just chains the commands, it doesn't skip the gate. Options:
+
+```bash
+./run_clipper.sh video.mp4 example_channel --all                  # skip the cut prompt, render every candidate
+./run_clipper.sh video.mp4 example_channel --clips clip-01,clip-03 # skip the prompt, render just these
+./run_clipper.sh video.mp4 example_channel --force-transcribe      # re-run whisper even if cached
+./run_clipper.sh video.mp4 example_channel --upload                # also run `clipper upload` at the end
+```
+
+Or run each stage yourself for full control between steps:
+
 ```bash
 clipper select "path/to/video.mp4" --channel example_channel
 clipper cut "path/to/video.mp4"
@@ -38,21 +57,11 @@ clipper package "path/to/video.mp4" --channel example_channel
 clipper upload "path/to/video.mp4" --channel example_channel   # optional, see YouTube upload setup below
 ```
 
-Each finished clip lands in `output/<video-id>/<clip-NN>/` with `clip.mp4`,
-`meta.json`, and `thumb.jpg` — either drag `clip.mp4` straight into YouTube
-Studio yourself, or run `clipper upload` to push it there via the API
-(uploads land **private** by default; you still review and publish manually).
-
-Or run all five as one command with `./run_clipper.sh`:
-
-```bash
-./run_clipper.sh "path/to/video.mp4" example_channel
-```
-
-`cut`'s approval prompt still runs interactively in the middle of it — this
-just chains the commands, it doesn't skip the gate. Pass `--all` or
-`--clips clip-01,clip-03` to skip that prompt, `--force-transcribe` to
-re-run whisper, or `--upload` to also run `clipper upload` at the end.
+Either way, each finished clip lands in `output/<video-id>/<clip-NN>/` with
+`clip.mp4`, `meta.json`, and `thumb.jpg` — either drag `clip.mp4` straight
+into YouTube Studio yourself, or run `clipper upload` / `--upload` to push it
+there via the API (uploads land **private** by default; you still review and
+publish manually).
 
 ## Set up a channel first
 
