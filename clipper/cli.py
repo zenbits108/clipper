@@ -3,10 +3,11 @@
     clipper select video.mp4 --channel <name>   # phase 1
     clipper cut video.mp4                        # phase 2
     clipper reframe video.mp4 --channel <name>   # phase 3
+    clipper caption video.mp4 --channel <name>   # phase 4
 
 `cut` is the approval gate: it reads the candidates `select` already wrote,
 shows them again, and only renders the ids the user accepts (or --all /
---clips to skip the prompt). Later phases add captions/package.
+--clips to skip the prompt). Later phases add package.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import json
 import sys
 from pathlib import Path
 
+from clipper.captions import CaptionError, caption_clip
 from clipper.config import ConfigError, load_channel, load_settings
 from clipper.cut import CutError, cut_clip
 from clipper.llm import ProviderError
@@ -182,6 +184,74 @@ def _cmd_reframe(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_caption(args: argparse.Namespace) -> int:
+    video_path = Path(args.video)
+    try:
+        settings = load_settings()
+        channel = load_channel(args.channel)
+    except ConfigError as exc:
+        print(f"Config error: {exc}", file=sys.stderr)
+        return 1
+
+    video_dir = settings.output_dir / video_id_for(video_path)
+    transcript_path = video_dir / "transcript.json"
+    if not transcript_path.exists():
+        print(
+            f"No cached transcript for this video in {video_dir}. Run `clipper select` first.",
+            file=sys.stderr,
+        )
+        return 1
+    transcript = json.loads(transcript_path.read_text(encoding="utf-8"))
+
+    clip_dirs = sorted(
+        d for d in video_dir.glob("clip-*") if d.is_dir() and (d / "reframed.mp4").exists()
+    )
+    if not clip_dirs:
+        print(
+            f"No reframed clips found under {video_dir}. Run `clipper reframe` first.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if args.clips:
+        wanted = {c.strip() for c in args.clips.split(",") if c.strip()}
+        unknown = wanted - {d.name for d in clip_dirs}
+        if unknown:
+            print(f"Unknown clip id(s): {', '.join(sorted(unknown))}", file=sys.stderr)
+            return 1
+        clip_dirs = [d for d in clip_dirs if d.name in wanted]
+
+    failures = []
+    processed = 0
+    for clip_dir in clip_dirs:
+        if (clip_dir / "clip.mp4").exists() and not args.force:
+            print(f"[{clip_dir.name}] already captioned, skipping (use --force to redo)")
+            continue
+        cut_meta_path = clip_dir / "cut.json"
+        if not cut_meta_path.exists():
+            print(f"[{clip_dir.name}] FAILED: missing cut.json", file=sys.stderr)
+            failures.append(clip_dir.name)
+            continue
+        cut_meta = json.loads(cut_meta_path.read_text(encoding="utf-8"))
+        try:
+            meta = caption_clip(clip_dir / "reframed.mp4", clip_dir, transcript, cut_meta, channel)
+        except CaptionError as exc:
+            print(f"[{clip_dir.name}] FAILED: {exc}", file=sys.stderr)
+            failures.append(clip_dir.name)
+            continue
+        print(
+            f"[{clip_dir.name}] {meta['word_count']} words, {meta['chunk_count']} chunks "
+            f"-> {meta['output_path']}"
+        )
+        processed += 1
+
+    if failures:
+        print(f"\n{len(failures)} clip(s) failed: {', '.join(failures)}", file=sys.stderr)
+        return 1
+    print(f"\n{processed} clip(s) captioned.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="clipper")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -227,6 +297,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--force", action="store_true", help="Re-reframe clips that already have reframed.mp4"
     )
     reframe_parser.set_defaults(func=_cmd_reframe)
+
+    caption_parser = subparsers.add_parser(
+        "caption", help="Burn word-level highlighted captions into reframed clips"
+    )
+    caption_parser.add_argument("video", help="Path to the source video file")
+    caption_parser.add_argument(
+        "--channel", required=True, help="Channel config name (config/channels/<name>.yaml)"
+    )
+    caption_parser.add_argument(
+        "--clips", help="Comma-separated clip ids to caption, e.g. clip-01,clip-03"
+    )
+    caption_parser.add_argument(
+        "--force", action="store_true", help="Re-caption clips that already have clip.mp4"
+    )
+    caption_parser.set_defaults(func=_cmd_caption)
 
     return parser
 

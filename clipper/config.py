@@ -83,6 +83,7 @@ class ChannelConfig:
 
 VALID_REFRAME_MODES = {"face-track", "center", "blur-pillarbox"}
 VALID_PROVIDERS = {"ollama", "openrouter"}
+VALID_CAPTION_POSITIONS = {"bottom_safe", "middle", "top_safe"}
 
 
 def _require(d: dict, key: str, ctx: str) -> Any:
@@ -159,12 +160,19 @@ def load_channel(name: str, config_dir: Optional[Path] = None) -> ChannelConfig:
         provider=provider,
         model=sel_raw.get("model"),
     )
+    caption_position = caption_raw.get("position", "bottom_safe")
+    if caption_position not in VALID_CAPTION_POSITIONS:
+        raise ConfigError(
+            f"Invalid caption.position '{caption_position}' in {path}; "
+            f"must be one of {sorted(VALID_CAPTION_POSITIONS)}"
+        )
+
     caption = CaptionConfig(
         font=_require(caption_raw, "font", f"caption ({path})"),
         font_size=int(_require(caption_raw, "font_size", f"caption ({path})")),
         primary_color=_require(caption_raw, "primary_color", f"caption ({path})"),
         highlight_color=_require(caption_raw, "highlight_color", f"caption ({path})"),
-        position=caption_raw.get("position", "bottom_safe"),
+        position=caption_position,
     )
     reframe = ReframeConfig(mode=reframe_mode)
 
