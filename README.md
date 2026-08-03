@@ -59,8 +59,17 @@ Fields that matter most:
 - `selection.clip_length.{min,max}_seconds` — hard bounds; candidates outside
   this range are rejected automatically. YouTube Shorts' actual platform
   ceiling is 180s, but the engagement sweet spot is 30-60s — a reasonable
-  default is `min: 25, max: 120` with the prompt telling the model to prefer
-  30-60s and only go longer when the argument genuinely needs the runway.
+  default once a channel has some history is `min: 25, max: 120` with the
+  prompt telling the model to prefer 30-60s and only go longer when the
+  argument genuinely needs the runway. **For a channel's first real uploads**
+  (no watch-history yet), start tighter — `20-30s` — to build a retention
+  baseline before trusting the algorithm with longer content; loosen back up
+  once YouTube Analytics > Research shows what length actually holds this
+  niche's audience. Whatever the bounds, the "no padding" rule matters more
+  than hitting a target length: a clip should be as long as its argument
+  needs and no longer — stretching a 40s idea to fill 60s hurts retention.
+  The hook also has to work in the first ~3 seconds regardless of length,
+  since 50-60% of viewers decide whether to swipe away almost instantly.
 - `selection.provider` / `selection.model` — `ollama` (local) or `openrouter`
   (hosted, needs `OPENROUTER_API_KEY` set). Connection details live in
   `config/settings.yaml`, not here.
