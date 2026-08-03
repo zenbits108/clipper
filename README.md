@@ -43,6 +43,17 @@ Each finished clip lands in `output/<video-id>/<clip-NN>/` with `clip.mp4`,
 Studio yourself, or run `clipper upload` to push it there via the API
 (uploads land **private** by default; you still review and publish manually).
 
+Or run all five as one command with `./run_clipper.sh`:
+
+```bash
+./run_clipper.sh "path/to/video.mp4" example_channel
+```
+
+`cut`'s approval prompt still runs interactively in the middle of it — this
+just chains the commands, it doesn't skip the gate. Pass `--all` or
+`--clips clip-01,clip-03` to skip that prompt, `--force-transcribe` to
+re-run whisper, or `--upload` to also run `clipper upload` at the end.
+
 ## Set up a channel first
 
 Every run needs `--channel <name>`, which points at
